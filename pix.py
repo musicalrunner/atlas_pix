@@ -1002,10 +1002,18 @@ def main_minimize_untuned():
     enable_chip(driver)
     find_minimum_vth(driver, 20)
 
-def occupancy_test():
+def occupancy_scan(args):
+    import readSR
+    print "Start"
+    readSR.collect(2,'testSR.csv',6,5)
+
+def occupancy_test_main(args):
+    chip.init_hpgene(chip.hpgene, 255)
+    chip.init_hpcntr(chip.hpcntr)
     driver = chip.DgeneDriver(chip.dgene, config_size=800)
     driver.init_blocks()
-    driver.enable_all_columns
+    driver.disable_all_columns()
+    driver.enable_hitor_all_columns()
 
 def main_minimize_tuned():
     """ Find minimum vth with all pixels enabled and set to tuned dac values. """
@@ -1044,7 +1052,7 @@ def main_tune_small(vth=84, target=.062, perbit=.003):
 
 def enable_columns(a,b):
 
-    set_config(70)
+    set_config(150)
     chip.init_hpgene(chip.hpgene, 255)
     chip.init_hpcntr(chip.hpcntr)
     driver = chip.DgeneDriver(chip.dgene, config_size=380)
@@ -1708,15 +1716,6 @@ def test_single_slow(col, row):
     v = measure_thresh_slow(driver, chip.hpcntr, chip.hpgene, col, row, '00000')
     print "Threshold:", vth_to_electrons(v[0]), " Noise:", vth_to_electrons(v[1])
     
-def occupancy_scan(args):
-    driver = chip.DgeneDriver(chip.dgene, config_size=380)
-    import readSR
-    #write_chip_tuned(driver)
-    enable_hitor_chip()
-    driver.clear_all_columns()
-    readSR.collect(2, 'occupancy2.csv', 6, 5)
-    driver.enable_all_columns()
-
 def tune_columns_maxtdac(driver, hpcntr, hpgene, cols, orig_pix, new_pix=None, outname='pixels_tune_maxtdac.csv'):
     if new_pix is None:
         new_pix = PixelLibrary.from_file('pixels_tune2.csv')
@@ -1730,11 +1729,21 @@ def tune_columns_maxtdac(driver, hpcntr, hpgene, cols, orig_pix, new_pix=None, o
 def tune_columns_mintdac(driver, hpcntr, hpgene, cols, orig_pix, new_pix=None, outname='pixels_tune_mintdac2.csv'):
     if new_pix is None:
         new_pix = PixelLibrary.from_file('pixels_tune_tdac30.csv')
+    delay = 1
+    min_time = 5
     for col in cols:
         for row in xrange(PixelColumn.npix):
-            new_pix[col][row] = dacbits
-            dacbits = dacbits - 1
-            new_pix[col][row] = dacbits
+            print col, row
+            dacbits = new_pix[col][row]
+            while dacbits > 0:
+                time.sleep(1) #let noise clear
+                dacbits = new_pix[col][row]
+                dacbits = interpret_dac_value(dacbits)-1
+                new_pix[col][row] = dacbits
+                print dacbits
+                v = measure_thresh_fast(driver, hpcntr, hpgene, col, row)
+                print v
+                new_pix.save(outname)
         new_pix.save(outname)
     new_pix.save(outname)
 
@@ -1774,9 +1783,9 @@ def new_tune_main(args):
     #print "First target: ", target1
     #perbit = np.average(dac16 - dac0) / 16.0
     #print "Perbit: ", perbit
-    perbit = 222
+    perbit = 2000
 
-    #go through each pixel and step down tdac until
+    #go through each pixel and step down tdac until hits are detected
     orig_pix = PixelLibrary.from_file('pixels_tune_tdac30.csv')
     tune_columns_mintdac(driver, chip.hpcntr, chip.hpgene, range(1,17), orig_pix, outname='pixels_tune_mintdac.csv')
 
@@ -1809,6 +1818,9 @@ def main_command_line():
     scan.set_defaults(func=main_scan)
     scan.add_argument('--vth', dest='vth', type=int, default=150, help='The vth setting to scan the chip at.')
     scan.add_argument('--pixels', dest='pixels', help='If provided, the chip is tuned to the values stored in this file before scanning.')
+    
+    occupancy_test = subparsers.add_parser('occupancy_test', help='Runs an occupancy test for the chip')
+    occupancy_test.set_defaults(func=occupancy_test_main)
 
     source = subparsers.add_parser('source', help='Run integral scan of source through the hitor. Note: this needs to be done after tuning.')
     source.set_defaults(func=source_scan)
@@ -1818,18 +1830,18 @@ def main_command_line():
 
     occupancy = subparsers.add_parser('occupancy', help='Runs an occupancy scan for the chip')
     occupancy.set_defaults(func=occupancy_scan)
-
+    
     args = parser.parse_args()
     args.func(args)
 
 if __name__ == "__main__":
-    #enable_columns(1,1)
+    #enable_columns(1,2)
     #enable_pixel(1,1,70)
     #disable_hitor_chip()
     #single_column_scan()
-    #set_config(100)
-    #main_command_line()
-    occupancy_test()
+    #set_config(150)
+    main_command_line()
+    #occupancy_test()
     #test_single_slow(15,2)
     # chip
     #source_scan()
