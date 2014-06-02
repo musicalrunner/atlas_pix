@@ -4,14 +4,21 @@ import argparse
 def collect(nsamples, outname, clock, data):
     scope = dscope.ScopeInst(0)
     scope.init_digital_channel(clk=clock)
-    traces = [scope.dtrace(timeout=30.0)[0][data] for i in range(nsamples)]
-	# save each sample as a row of comma-separated bits
-    outfile = open(outname, 'w')
-    for trace in traces:
-        tmp = [str(b) for b in trace]
-        outfile.write(','.join(tmp) + '\n')
-    outfile.close()
-    return
+    #import pdb
+    #pdb.set_trace()
+    try:
+        traces = [scope.dtrace(timeout=1.0)[0][data] for i in range(nsamples)]
+    except IndexError:
+        print "dtrace timed out at least once"
+        #print e
+    else:
+        # save each sample as a row of comma-separated bits
+        outfile = open(outname, 'w')
+        for trace in traces:
+            tmp = [str(b) for b in trace]
+            outfile.write(','.join(tmp) + '\n')
+            outfile.close()
+        return
 
 def main():
     parser = argparse.ArgumentParser(description="Read a shift register (defaults are clock on D0, SR on D1).")
