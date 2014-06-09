@@ -12,6 +12,7 @@ def collect(nsamples, outname, clock, data):
         print "dtrace timed out at least once"
         #print e
     else:
+        # save each sample as a row of comma-separated bits
         outfile = open(outname, 'w')
         for trace in traces:
             tmp = [str(b) for b in trace]
@@ -23,8 +24,8 @@ def main():
     parser = argparse.ArgumentParser(description="Read a shift register (defaults are clock on D0, SR on D1).")
     parser.add_argument('nsamples', type=int, help='The number of samples to read from the shift register.')
     parser.add_argument('outfile', help='Save csv traces to designated file.')
-    parser.add_argument('--clock', type=int, help='Specify the channel which samples the clock.',default=0)
-    parser.add_argument('--data', type=int, help='Specify the channel which samples the data.',default=1)
+    parser.add_argument('--clock', type=int, help='Specify the scope channel which samples the clock.',default=0)
+    parser.add_argument('--data', type=int, help='Specify the scope channel which samples the data.',default=1)
     args = parser.parse_args()
     collect(args.nsamples,args.outfile,args.clock,args.data)
     return
