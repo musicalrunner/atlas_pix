@@ -95,13 +95,13 @@ InputSignalsDefaultsDict={
 
 # Original data generator setup.
 def CreateBlocs(dgene):
-    dgene.write(":DATA:BLOC:DEL:ALL")
-    dgene.write(":DATA:BLOC:RENAME \"UNNAMED\",\"STRTBLK\"")
-    dgene.write(":DATA:BLOC:SIZE \"STRTBLK\"," + str(ALLBLKSSIZE))
+    dgene.write(":DATA:BLOC:DEL:ALL") # deletes all blocks; memory area consists of one block: "UNNAMED"
+    dgene.write(":DATA:BLOC:RENAME \"UNNAMED\",\"STRTBLK\"") # renames "UNNAMED" to "STRTBLK"
+    dgene.write(":DATA:BLOC:SIZE \"STRTBLK\"," + str(ALLBLKSSIZE)) # changes size of "STRTBLK" to str(ALLBLKSSIZE)
 
     Blkaddr=STRTBLKSIZE
     for blk in Blocks[1:]:
-       dgene.write(":DATA:BLOC:ADD "+str(Blkaddr)+",\""+ blk +"\"")
+       dgene.write(":DATA:BLOC:ADD "+str(Blkaddr)+",\""+ blk +"\"") # adds block(s) starting at address 'str(Blkaddr)' named 'blk'
        Blkaddr+=BlocksDict[blk]
     return
 
@@ -110,14 +110,14 @@ def initPats(i, dgene):
         i=0
     for key in InputSignalsPodsDict.keys():
         default=InputSignalsDefaultsDict[key][i][0]*ALLBLKSSIZE
-        Str2Dgene=':DATA:PATT:BIT '+str(InputSignalsPodsDict[key][2])+',0,'+str(ALLBLKSSIZE)+',#'+ str(len(str(ALLBLKSSIZE)))+str(ALLBLKSSIZE)+default +'\n'
+        Str2Dgene=':DATA:PATT:BIT '+str(InputSignalsPodsDict[key][2])+',0,'+str(ALLBLKSSIZE)+',#'+ str(len(str(ALLBLKSSIZE)))+str(ALLBLKSSIZE)+default +'\n' # sets the data memory bit pattern section; position: InputSignalsPodsDict[key][2], address: str(ALLBLKSSIZE), length: len(str(ALLBLOCKSIZE)), data: default
         dgene.write(Str2Dgene)
-        dgene.write(':MODE:STATE ENHANCED')        
+        dgene.write(':MODE:STATE ENHANCED') # sets the run mode to endhanced (pattern data is output according to defined sequence)        
     return
 
 def initSeqs(dgene):
-    dgene.write(':DATA:SEQ:DEL:ALL')      
-    for seqName in Blocks: #SEQDict.keys():
+    dgene.write(':DATA:SEQ:DEL:ALL') # deletes all blocks; memory area consists of one block: "UNNAMED"
+    for seqName in Blocks: #SEQDict.keys(): # adds a sequence step
         messg=':DATA:SEQ:ADD '
         messg += SEQDict[seqName][0] + ',\"' + seqName + '\",' + SEQDict[seqName][1]+ ',' + SEQDict[seqName][2] + ',' +SEQDict[seqName][3]+ ',' +SEQDict[seqName][4]+ ',' +SEQDict[seqName][5]
         dgene.write(messg)
@@ -167,20 +167,24 @@ def binary_string(x,nbits=5,invert=False):
     blist = filled_binary_list(x,nbits)
     if not invert: 
         return ''.join((str(x) for x in blist))
-    else:        return ''.join((str(x) for x in blist))[::-1]
+    else:        
+        return ''.join((str(x) for x in blist))[::-1]
 
+def number():
+    print "binary_string(129,8,invert=True)"
 
 # Pattern Generators
 
 def get_control_pattern_pixel(col,config_bits='00000000',lden='0',S0='0',S1='0',config_mode='00', global_readout_enable='0', count_hits_not='0', count_enable='0', count_clear_not='0', SRDO_load='0'):
     column_address = binary_string(col, 6)
-    return global_readout_enable + SRDO_load + NCout2 + count_hits_not + count_enable + count_clear_not + S0 + S1 + config_mode + config_bits + lden + SRCLR_SEL + HITLD_IN + NCout21_25 + column_address
-
+    return global_readout_enable + SRDO_load + NCout2 + count_hits_not + count_enable + count_clear_not + S0 + S1 + config_mode + config_bits + lden + SRCLR_SEL + HITLD_IN + NCout21_25 + column_address # 32 bits
 
 def get_dac_pattern(vth=150, DisVbn=49, VbpThStep=100, PrmpVbp=142, PrmpVbnFol=35, PrmpVbf=11): # fol35 vbp142 vbf11
     default=binary_string(129,8,invert=True)
     return default + default + default + default + binary_string(DisVbn,8) + default + default + default + default + default + default + binary_string(VbpThStep,8) + binary_string(PrmpVbp,8) + binary_string(PrmpVbnFol,8) + binary_string(vth,8) + binary_string(PrmpVbf,8) + default + default
-
+    
+    # 10000001 10000001 10000001 10000001 10001100 10000001 10000001 10000001 10000001 10000001 10000001 00100110 01110001 11000100 01101001 11010000 10000001 10000001; 144 bits
+    # executed during set_config
 
 def get_control_pattern(global_readout_enable='0', count_hits_not='0', count_enable='0', count_clear_not='0', config_mode = '00', SRDO_load='0', S0='0', S1='0', col=None):
     if col is None:
@@ -188,8 +192,11 @@ def get_control_pattern(global_readout_enable='0', count_hits_not='0', count_ena
     else:
         column_address = binary_string(col, 6)
     return global_readout_enable + SRDO_load + NCout2 + count_hits_not + count_enable + count_clear_not + S0 + S1 + config_mode + LD_IN0_7 + LDENABLE_SEL + SRCLR_SEL + HITLD_IN + NCout21_25 + column_address
+    
+    # 0 00 0 0 0 0 0 0 00 00000000 0 0 0 00000 (xxxxx); 32 bits
+    # executed during set_config
 
-
+    # feed in low bits to SR_in, and look at output for SR_out on the scope. Then, feed high bits into SR_in, and look at output on SR_out. Once it changes from low to high, count the number of clocks: this is the length of the shift register. Repeat for global SR: GCfgDout and GCfgCK_P 
 
 class DgeneDriver:
     """Controls issuing commands to the a generator in an efficient way.
@@ -229,21 +236,21 @@ class DgeneDriver:
         sorted_keys.append('ENDBLK')
         self.all_block_size = sum(self.blocks.values())
         # Create the blocks
-        self.dgene.write(":DATA:BLOC:DEL:ALL")
-        self.dgene.write(":DATA:BLOC:RENAME \"UNNAMED\",\"STRTBLK\"")
-        self.dgene.write(":DATA:BLOC:SIZE \"STRTBLK\",%i" % self.all_block_size)
+        self.dgene.write(":DATA:BLOC:DEL:ALL") # deletes all blocks; memory area consists of one block: "UNNAMED"
+        self.dgene.write(":DATA:BLOC:RENAME \"UNNAMED\",\"STRTBLK\"") # renames "UNNAMED" to "STRTBLK"
+        self.dgene.write(":DATA:BLOC:SIZE \"STRTBLK\",%i" % self.all_block_size) # changes size of "STRTBLK" to 'all_block_size'
         addr = self.blocks['STRTBLK']
         for block in sorted_keys[1:]:
-            self.dgene.write(':DATA:BLOC:ADD %i,"%s"' % (addr, block))
+            self.dgene.write(':DATA:BLOC:ADD %i,"%s"' % (addr, block)) # adds block(s) starting at address 'addr' named 'block'
             addr += self.blocks[block]
         # Init SLALTBUS to 1
-        self.dgene.write(":MODE:UPDate AUTO")
-        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['SlAltBus'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, '1'*self.all_block_size))
+        self.dgene.write(":MODE:UPDate AUTO") # sets the output pattern update method to AUTO
+        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['SlAltBus'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, '1'*self.all_block_size)) # sets the data memory bit pattern section; position: SlAltBus, address: 'all_block_size', length: len('all_block_size'), data: '1'*all_block_size
         # Write the block options
-        self.dgene.write(':DATA:SEQ:DEL:ALL')
+        self.dgene.write(':DATA:SEQ:DEL:ALL') # deletes all sequence definitions
         for name in sorted_keys:
             opts = self.block_opts[name]
-            self.dgene.write(':Data:SEQ:ADD %s,"%s",%s,%s,%s,%s,%s' % (opts[0],name,opts[1],opts[2],opts[3],opts[4],opts[5]))
+            self.dgene.write(':Data:SEQ:ADD %s,"%s",%s,%s,%s,%s,%s' % (opts[0],name,opts[1],opts[2],opts[3],opts[4],opts[5])) # adds a sequence step
         # Update number enabled
         self._n_enabled = self.n
 
@@ -259,12 +266,12 @@ class DgeneDriver:
         self.n = 1
         CreateBlocs(self.dgene)
         initSeqs(self.dgene)
-        self.dgene.write(":MODE:UPDate MAN")
+        self.dgene.write(":MODE:UPDate MAN") # sets the output pattern update method to manual
         initPats(0, self.dgene)
         self.all_block_size = ALLBLKSSIZE
         # Init SLALTBUS to 1
-        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['SlAltBus'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, '1'*self.all_block_size))
-        self.dgene.write(':DATA:UPDate')
+        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['SlAltBus'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, '1'*self.all_block_size)) # sets the data memory bit pattern section; position: SlAltBus, address: 'all_block_size', length: len('all_block_size'), data: '1'*all_block_size
+        self.dgene.write(':DATA:UPDate') # transfers contents of data memory to pattern generation memory (so output reflects most recent data)
         self._n_enabled = 1;
 
     def write_blocks(self, commands, outfile=None):
@@ -289,12 +296,12 @@ class DgeneDriver:
                         print "The subcommand is %i bits and should be %i bits." % (len(subcommand),self.all_block_size)
                     if len(instructions) < i + 1:
                         instructions.append([])
-                    output = ':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict[key][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, subcommand)
+                    output = ':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict[key][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, subcommand) # sets the data memory bit pattern section; position: InputSignalsPodsDict[key][2], address: 'all_block_size', length: len('all_block_size'), data: subcommand
                     instructions[i].append(output)
             for instruction in instructions:
-                instruction.insert(0,'MODE:UPDate MAN')
-                instruction.append('DATA:UPDate')
-                instruction.append('*TRG')
+                instruction.insert(0,'MODE:UPDate MAN') # sets the output pattern update method to manual
+                instruction.append('DATA:UPDate') # transfers contents of data memory to pattern generation memory (so output reflects most recent data)
+                instruction.append('*TRG') # generates trigger event
                 if outfile is not None:
                     outfile.write('; '.join(instruction))
                 for outstr in instruction:
@@ -641,17 +648,17 @@ class DgeneDriver:
         clock_pattern = ('0'*period + '1'*period) * (self.all_block_size // (2*period) + 1)
         clock_pattern = clock_pattern[:self.all_block_size]
         if freq > 1:
-            self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY %iMHZ' % (4*freq))
+            self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY %iMHZ' % (4*freq)) # sets internal clock oscillator frequency to 4*freq mega hertz
         if freq < 1:
-            self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY %iKHZ' % (4*1000*freq))
-        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['CntCK'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, clock_pattern))        
+            self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY %iKHZ' % (4*1000*freq)) # sets internal clock oscillator frequency to 4*1000*freq meg hertz
+        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['CntCK'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, clock_pattern)) # sets the data memory bit pattern section; position: CntCK, address: 'all_block_size', length: len('all_block_size'), data: clock_pattern
         return
 
     def disable_count_clock(self):
         """ Disable the external counting clock."""
         clock_pattern_disable = '0' * self.all_block_size
-        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['CntCK'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, clock_pattern_disable))        
-        self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY 200MHZ' )
+        self.dgene.write(':DATA:PATT:BIT %i,0,%i,#%i%i%s\n' % (InputSignalsPodsDict['CntCK'][2], self.all_block_size, len(str(self.all_block_size)), self.all_block_size, clock_pattern_disable)) # sets the data memory bit pattern section; position: CntCK, address: 'all_block_size', length: len('all_block_size'), data: clock_pattern_disable
+        self.dgene.write(':SOURCE:OSCILLATOR:INTERNAL:FREQUENCY 200MHZ' ) # sets internal clock oscillator frequency to 200 mega hertz
         return
 
 # End of class Driver
@@ -668,7 +675,7 @@ class GpibInst(visa.GpibInstrument):
     def __init__(self,name):       
         visa.GpibInstrument.__init__(self,"GPIB::"+GpibInstDict[name],board_number=0)
     def finished(self):
-        self.write("*OPC?")
+        self.write("*OPC?") # sets bit to 1 when operation is complete
         if self.read()[0] == '1':
             return True
         else:
@@ -676,52 +683,52 @@ class GpibInst(visa.GpibInstrument):
 
         
 def init_hpgene(hpgene, ninjects=255):
-    hpgene.write("*RST")
-    hpgene.write("*CLS")
-    hpgene.write("*ESE 1")
-    hpgene.write("*SRE 16")
-    hpgene.write("*OPC")
+    hpgene.write("*RST") # reset to default
+    hpgene.write("*CLS") # clears status
+    hpgene.write("*ESE 1") # enable bit 0 ("operation complete" bit) in standard event register
+    hpgene.write("*SRE 16") # enable bit 5 ("standard event" in Status byte) in standard event register
+    hpgene.write("*OPC") # sets bit to 1 when operation is complete
     while hpgene.finished() is False: pass
 
-    hpgene.write("FUNC:USER NRAMP")
+    hpgene.write("FUNC:USER NRAMP") # selects built-in arbitrary waveform: negative ramp
     while not hpgene.finished() : pass
 
-    hpgene.write("FUNC:SHAP USER")
+    hpgene.write("FUNC:SHAP USER") # outputs the carrier waveform
     while not hpgene.finished() : pass
 
-    hpgene.write("VOLT 0.2")
-    hpgene.write("VOLT:OFFSet 0.0")
+    hpgene.write("VOLT 0.2") # sets the voltage of carrier waveform to 0.2 V
+    hpgene.write("VOLT:OFFSet 0.0") # sets offset of the carrier waveform  to 0.0 V
 
-    hpgene.write("OUTPut:LOAD 50")
+    hpgene.write("OUTPut:LOAD 50") # output termination is 50 ohms
 
-    hpgene.write("TRIGger:SOURce BUS")
+    hpgene.write("TRIGger:SOURce BUS") # trigger source is "bus"
 
-    hpgene.write("BM:SOURce INT")
+    hpgene.write("BM:SOURce INT") # burst modulation is stored in volatile memory (default)
 
-    hpgene.write("BM:NCYC %i" % ninjects)
-    hpgene.write("FREQ 10000")
-    hpgene.write("BM:STATe ON")
+    hpgene.write("BM:NCYC %i" % ninjects) # sets burst count to ninjects (255)
+    hpgene.write("FREQ 10000") # sets frequency to 10 kilohertz
+    hpgene.write("BM:STATe ON") # enable the burst mode
     return
 
 def init_hpcntr(hpcntr):
-    hpcntr.write("*RST");
-    hpcntr.write("*CLS");
-    hpcntr.write("*OPC");
+    hpcntr.write("*RST"); # reset to default
+    hpcntr.write("*CLS"); # clears status
+    hpcntr.write("*OPC"); # sets bit to 1 when operation is complete
     
-    hpcntr.write(":CONF:TOT:CONT (@1),(@1)")
-    hpcntr.write(":INIT:CONT OFF")
+    hpcntr.write(":CONF:TOT:CONT (@1),(@1)") # selects positive trigger slope and sets primary/secondary channel
+    hpcntr.write(":INIT:CONT OFF") # sets trigger system in idle state: no continuous measurement
 
-    hpcntr.write(":INP1:COUP DC")
-    hpcntr.write(":INP1:IMP MAX")
+    hpcntr.write(":INP1:COUP DC") # sets coupling to DC
+    hpcntr.write(":INP1:IMP MAX") # sets impedence to 1 mega ohm
 
-    hpcntr.write(":INP:LEV:AUTO 0")
-    hpcntr.write(":INP:LEV 0.5")
+    hpcntr.write(":INP:LEV:AUTO 0") # turn off auto trigger
+    hpcntr.write(":INP:LEV 0.5") # sets trigger level to 0.5 V
 
-    hpcntr.write(":INP1:SLOP NEG")
-    hpcntr.write(":INP1:ATT 1")
+    hpcntr.write(":INP1:SLOP NEG") # counter tiggers on negative slope
+    hpcntr.write(":INP1:ATT 1") # attenuate input signal by factor of 1
 
-    hpcntr.write(":SENS:ACQ:HOFF:STAT ON")
-    hpcntr.write(":SENS:ACQ:HOFF:TIME 10e-6")
+    hpcntr.write(":SENS:ACQ:HOFF:STAT ON") # not documented? (possibly enables the state: starts count)
+    hpcntr.write(":SENS:ACQ:HOFF:TIME 10e-6") # sets hold off time value to 10 micro seconds
     return
 
 dgene=GpibInst("DG2020")
